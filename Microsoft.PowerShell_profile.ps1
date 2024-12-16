@@ -120,7 +120,7 @@ function admin {
 }
 Set-Alias -Name su -Value admin
 
-function uptime {
+function uptime() {
     try {
         # check powershell version
         if ($PSVersionTable.PSVersion.Major -eq 5) {
@@ -131,7 +131,7 @@ function uptime {
             $lastBootStr = net statistics workstation | Select-String "since" | ForEach-Object { $_.ToString().Replace('Statistics since ', '') }
             # check date format
             if ($lastBootStr -match '^\d{2}/\d{2}/\d{4}') {
-                $dateFormat = 'dd/MM/yyyy'
+                $dateFormat = 'MM/dd/yyyy'
             }
             elseif ($lastBootStr -match '^\d{2}-\d{2}-\d{4}') {
                 $dateFormat = 'dd-MM-yyyy'
