@@ -96,3 +96,35 @@ else {
         Write-Error "Failed to backup and update the profile. Error: $_"
     }
 }
+
+try {
+    winget install starship
+}
+catch {
+    Write-Error "Failed to install Starship. Error: $_"
+}
+
+Install-NerdFonts -FontName "CascadiaCode" -FontDisplayName "CaskaydiaCove NF"
+Install-NerdFonts -FontName "FiraCode" -FontDisplayName "FiraCode Nerd Font"
+
+if ((Test-Path -Path $PROFILE) -and (winget list --name "starship" -e) -and ($fontFamilies -contains "CaskaydiaCove NF") -and ($fontFamilies -contains "FiraCode Nerd Font")) {
+    Write-Host "Setup completed successfully. Please restart your PowerShell session to apply changes."
+}
+else {
+    Write-Warning "Setup completed with errors. Please check the error messages above."
+}
+
+try {
+    Install-Module -Name Terminal-Icons -Repository PSGallery -Force
+}
+catch {
+    Write-Error "Failed to install Terminal Icons module. Error: $_"
+}
+
+try {
+    winget install -e --id ajeetdsouza.zoxide
+    Write-Host "zoxide installed successfully."
+}
+catch {
+    Write-Error "Failed to install zoxide. Error: $_"
+}
