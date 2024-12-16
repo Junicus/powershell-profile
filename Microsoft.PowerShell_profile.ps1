@@ -124,7 +124,7 @@ function uptime {
     try {
         # check powershell version
         if ($PSVersionTable.PSVersion.Major -eq 5) {
-            $lastBoot = (Get-WmiObject win32_operatingsystem).LastBootUpTime
+            $lastBoot = (Get-WmiObject Win32_OperatingSystem).LastBootUpTime
             $bootTime = [System.Management.ManagementDateTimeConverter]::ToDateTime($lastBoot)
         }
         else {
@@ -173,8 +173,6 @@ function uptime {
 
         # Uptime output
         Write-Host ("Uptime: {0} days, {1} hours, {2} minutes, {3} seconds" -f $days, $hours, $minutes, $seconds) -ForegroundColor Blue
-        
-
     }
     catch {
         Write-Error "An error occurred while retrieving system uptime."
