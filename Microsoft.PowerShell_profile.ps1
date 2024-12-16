@@ -166,6 +166,36 @@ function cpy { Set-Clipboard $args[0] }
 
 function pst { Get-Clipboard }
 
+$scriptblock = {
+    param($wordToComplete, $commandAst, $cursorPosition)
+    dotnet complete --position $cursorPosition $commandAst.ToString() |
+    ForEach-Object {
+        [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+    }
+}
+Register-ArgumentCompleter -Native -CommandName dotnet -ScriptBlock $scriptblock
+
+
+function Get-Theme {
+    Invoke-Expression (&starship init powershell)
+}
+
+Get-Theme
+if (Get-Command zoxide -ErrorAction SilentlyContinue) {
+    Invoke-Expression (& { (zoxide init powershell | Out-String) })
+}
+else {
+    Write-Host "zoxide command not found. Attempting to install via winget..."
+    try {
+        winget install -e --id ajeetdsouza.zoxide
+        Write-Host "zoxide installed successfully. Initializing..."
+        Invoke-Expression (& { (zoxide init powershell | Out-String) })
+    }
+    catch {
+        Write-Error "Failed to install zoxide. Error: $_"
+    }
+}
+
 Set-Alias -Name z -Value __zoxide_z -Option AllScope -Scope Global -Force
 Set-Alias -Name zi -Value __zoxide_zi -Option AllScope -Scope Global -Force
 
