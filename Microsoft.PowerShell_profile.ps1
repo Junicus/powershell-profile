@@ -120,8 +120,75 @@ function admin {
 }
 Set-Alias -Name su -Value admin
 
-function Reload-Profile {
+function uptime {
+    try {
+        # check powershell version
+        if ($PSVersionTable.PSVersion.Major -eq 5) {
+            $lastBoot = (Get-WmiObject win32_operatingsystem).LastBootUpTime
+            $bootTime = [System.Management.ManagementDateTimeConverter]::ToDateTime($lastBoot)
+        }
+        else {
+            $lastBootStr = net statistics workstation | Select-String "since" | ForEach-Object { $_.ToString().Replace('Statistics since ', '') }
+            # check date format
+            if ($lastBootStr -match '^\d{2}/\d{2}/\d{4}') {
+                $dateFormat = 'dd/MM/yyyy'
+            }
+            elseif ($lastBootStr -match '^\d{2}-\d{2}-\d{4}') {
+                $dateFormat = 'dd-MM-yyyy'
+            }
+            elseif ($lastBootStr -match '^\d{4}/\d{2}/\d{2}') {
+                $dateFormat = 'yyyy/MM/dd'
+            }
+            elseif ($lastBootStr -match '^\d{4}-\d{2}-\d{2}') {
+                $dateFormat = 'yyyy-MM-dd'
+            }
+            elseif ($lastBootStr -match '^\d{2}\.\d{2}\.\d{4}') {
+                $dateFormat = 'dd.MM.yyyy'
+            }
+            
+            # check time format
+            if ($lastBootStr -match '\bAM\b' -or $lastBootStr -match '\bPM\b') {
+                $timeFormat = 'h:mm:ss tt'
+            }
+            else {
+                $timeFormat = 'HH:mm:ss'
+            }
+
+            $bootTime = [System.DateTime]::ParseExact($lastBootStr, "$dateFormat $timeFormat", [System.Globalization.CultureInfo]::InvariantCulture)
+        }
+
+        # Format the start time
+        ### $formattedBootTime = $bootTime.ToString("dddd, MMMM dd, yyyy HH:mm:ss", [System.Globalization.CultureInfo]::InvariantCulture)
+        $formattedBootTime = $bootTime.ToString("dddd, MMMM dd, yyyy HH:mm:ss", [System.Globalization.CultureInfo]::InvariantCulture) + " [$lastBootStr]"
+        Write-Host "System started on: $formattedBootTime" -ForegroundColor DarkGray
+
+        # calculate uptime
+        $uptime = (Get-Date) - $bootTime
+
+        # Uptime in days, hours, minutes, and seconds
+        $days = $uptime.Days
+        $hours = $uptime.Hours
+        $minutes = $uptime.Minutes
+        $seconds = $uptime.Seconds
+
+        # Uptime output
+        Write-Host ("Uptime: {0} days, {1} hours, {2} minutes, {3} seconds" -f $days, $hours, $minutes, $seconds) -ForegroundColor Blue
+        
+
+    }
+    catch {
+        Write-Error "An error occurred while retrieving system uptime."
+    }
+}
+
+function reload-profile {
     & $PROFILE 
+}
+
+function unzip ($file) {
+    Write-Output("Extracting", $file, "to", $pwd)
+    $fullFile = Get-ChildItem -Path $pwd -Filter $file | ForEach-Object { $_.FullName }
+    Expand-Archive -Path $fullFile -DestinationPath $pwd
 }
 
 function grep($regex, $dir) {
@@ -134,6 +201,14 @@ function grep($regex, $dir) {
 
 function df {
     Get-Volume
+}
+
+function sed($file, $find, $replace) {
+    (Get-Content $file).replace("$find", $replace) | Set-Content $file
+}
+
+function which($name) {
+    Get-Command $name | Select-Object -ExpandProperty Definition
 }
 
 function export($name, $value) {
@@ -157,34 +232,108 @@ function tail {
     Get-Content $Path -Tail $n -Wait:$f
 }
 
+function nf { param($name) New-Item -ItemType "file" -Path . -Name $name }
+
+function mkcd { param($dir) mkdir $dir -Force; Set-Location $dir }
+
+function trash($path) {
+    $fullPath = (Resolve-Path -Path $path).Path
+
+    if (Test-Path $fullPath) {
+        $item = Get-Item $fullPath
+
+        if ($item.PSIsContainer) {
+            # Handle directory
+            $parentPath = $item.Parent.FullName
+        }
+        else {
+            # Handle file
+            $parentPath = $item.DirectoryName
+        }
+
+        $shell = New-Object -ComObject 'Shell.Application'
+        $shellItem = $shell.NameSpace($parentPath).ParseName($item.Name)
+
+        if ($item) {
+            $shellItem.InvokeVerb('delete')
+            Write-Host "Item '$fullPath' has been moved to the Recycle Bin."
+        }
+        else {
+            Write-Host "Error: Could not find the item '$fullPath' to trash."
+        }
+    }
+    else {
+        Write-Host "Error: Item '$fullPath' does not exist."
+    }
+}
+
+function docs { 
+    $docs = if (([Environment]::GetFolderPath("MyDocuments"))) { ([Environment]::GetFolderPath("MyDocuments")) } else { $HOME + "\Documents" }
+    Set-Location -Path $docs
+}
+    
+function dtop { 
+    $dtop = if ([Environment]::GetFolderPath("Desktop")) { [Environment]::GetFolderPath("Desktop") } else { $HOME + "\Documents" }
+    Set-Location -Path $dtop
+}
+
+function k9 { Stop-Process -Name $args[0] }
+
 function la { Get-ChildItem -Path . -Force | Format-Table -AutoSize }
 function ll { Get-ChildItem -Path . -Force -Hidden | Format-Table -AutoSize }
 
+function gs { git status }
+
+function ga { git add . }
+
+function gc { param($m) git commit -m "$m" }
+
+function gp { git push }
+
+function g { __zoxide_z github }
+
+function gcl { git clone "$args" }
+
+function gcom {
+    git add .
+    git commit -m "$args"
+}
+function lazyg {
+    git add .
+    git commit -m "$args"
+    git push
+}
+
 function sysinfo { Get-ComputerInfo }
+
+function flushdns {
+    Clear-DnsClientCache
+    Write-Host "DNS has been flushed"
+}
 
 function cpy { Set-Clipboard $args[0] }
 
 function pst { Get-Clipboard }
 
 $PSReadLineOptions = @{
-    EditMode = 'Windows'
-    HistoryNoDuplicates = $true
+    EditMode                      = 'Windows'
+    HistoryNoDuplicates           = $true
     HistorySearchCursorMovesToEnd = $true
-    Colors = @{
-        Command = '#87CEEB'  # SkyBlue (pastel)
+    Colors                        = @{
+        Command   = '#87CEEB'  # SkyBlue (pastel)
         Parameter = '#98FB98'  # PaleGreen (pastel)
-        Operator = '#FFB6C1'  # LightPink (pastel)
-        Variable = '#DDA0DD'  # Plum (pastel)
-        String = '#FFDAB9'  # PeachPuff (pastel)
-        Number = '#B0E0E6'  # PowderBlue (pastel)
-        Type = '#F0E68C'  # Khaki (pastel)
-        Comment = '#D3D3D3'  # LightGray (pastel)
-        Keyword = '#8367c7'  # Violet (pastel)
-        Error = '#FF6347'  # Tomato (keeping it close to red for visibility)
+        Operator  = '#FFB6C1'  # LightPink (pastel)
+        Variable  = '#DDA0DD'  # Plum (pastel)
+        String    = '#FFDAB9'  # PeachPuff (pastel)
+        Number    = '#B0E0E6'  # PowderBlue (pastel)
+        Type      = '#F0E68C'  # Khaki (pastel)
+        Comment   = '#D3D3D3'  # LightGray (pastel)
+        Keyword   = '#8367c7'  # Violet (pastel)
+        Error     = '#FF6347'  # Tomato (keeping it close to red for visibility)
     }
-    PredictionSource = 'History'
-    PredictionViewStyle = 'ListView'
-    BellStyle = 'None'
+    PredictionSource              = 'History'
+    PredictionViewStyle           = 'ListView'
+    BellStyle                     = 'None'
 }
 Set-PSReadLineOption @PSReadLineOptions
 
